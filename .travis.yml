@@ -1,0 +1,58 @@
+language: java
+jdk:
+  - oraclejdk8
+
+sudo: false
+install: true
+
+script:
+  - ./gradlew build
+
+after_success:
+ - mkdir codedeploy
+ - zip -r CSYEASS7.zip build/libs/ROOT.war appspec.yml restartTomcat.sh aws/cloudwatch/awslogs.conf restartCloudWatch.sh
+ - ls -al
+ - mv CSYEASS7.zip codedeploy/ 
+ - ls -al
+ - pwd
+ - cd codedeploy
+ - ls -al
+ - pwd
+
+
+before_deploy:
+ - cd ..
+
+
+deploy:
+ - provider: s3
+   access_key_id: $ACCESS_KEY_ID
+   secret_access_key: $SECRET_ACCESS_KEY
+   local_dir: codedeploy
+   bucket: $BUCKET_NAME
+   region: us-east-1
+   skip_cleanup: true
+   all_branches: true
+   on:
+    all_branches: true
+ - provider: codedeploy
+   access_key_id: $ACCESS_KEY_ID
+   bucket: $BUCKET_NAME
+   key: CSYEASS7.zip
+   bundle_type: zip
+   application: csye6225application
+   deployment_group: csye6225application
+   region: us-east-1
+   secret_access_key: $SECRET_ACCESS_KEY
+   wait-until-deployed: true
+ 
+notifications:
+  email:
+    recipients:
+     - barbosa.el@husky.neu.edu
+     - patel.nisar@husky.neu.edu
+     - babel.i@husky.neu.edu
+     - dodeja.p@husky.neu.edu
+
+
+

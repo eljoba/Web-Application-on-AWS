@@ -1,0 +1,19 @@
+{
+"Comment": "Update record to reflect new IP address of home router",
+    "Changes": [
+        {
+            "Action": "CREATE",
+            "ResourceRecordSet": {
+                "Name": "www.csye6225-fall2017-dodejap.me.",
+                "Type": "A",
+                "TTL": 60,
+                "ResourceRecords": [
+                {
+                    "Value": "192.168.163.129"
+                }
+            ]
+
+            }
+        }
+    ]
+}

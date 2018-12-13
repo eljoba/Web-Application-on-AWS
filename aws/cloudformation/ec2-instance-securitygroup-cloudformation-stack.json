@@ -1,0 +1,740 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "CloudFormation Template for CSYE 6225 - Fall 2017",
+	"Parameters": {
+		"ImageId": {
+			"Type": "String"
+		},
+		"InstanceType": {
+			"Type": "String"
+		},
+		"KeyName": {
+			"Type": "String"
+		},
+		"SubnetId": {
+			"Type": "String"
+		},
+		"GroupName": {
+			"Type": "String"
+		},
+		"GroupName1": {
+			"Type": "String"
+		},
+		"HostedZoneId": {
+			"Type": "String"
+		},
+		"Name": {
+			"Type": "String"
+		},
+		"VpcId": {
+			"Type": "String"
+		},
+		"AllocatedStorage": {
+			"Type": "String"
+		},
+		"DBInstanceClass": {
+			"Type": "String"
+		},
+		"RDSGroupName": {
+			"Type": "String"
+		},
+		"Engine": {
+			"Type": "String"
+		},
+		"EngineVersion": {
+			"Type": "String"
+		},
+		"DBInstanceIdentifier": {
+			"Type": "String"
+		},
+		"DBUser": {
+			"Type": "String"
+		},
+		"DBPassword": {
+			"Type": "String"
+		},
+		"DBName": {
+			"Type": "String"
+		},
+		"SubnetId2": {
+			"Type": "String"
+		},
+		"TableName": {
+			"Type": "String"
+		},
+		"PrimaryKeyName": {
+			"Type": "String"
+		},
+		"S3BucketName": {
+			"Type": "String"
+		},
+		"CodeDepEc2ServiceRole": {
+			"Type": "String"
+		},
+		"CodeDepRole": {
+			"Type": "String"
+		},
+		"TravisS3": {
+			"Type": "String"
+		},
+		"CodeDepEC2S3": {
+			"Type": "String"
+		},
+		"TravisCodeDep": {
+			"Type": "String"
+		},
+		"LamdaSnsRole": {
+			"Type": "String"
+		},
+		"SnsTopic": {
+			"Type": "String"
+		},
+		"CloudwatchPolicy": {
+			"Type": "String"
+		},
+		"certificatearn": {
+			"Type": "String"
+		}
+	},
+	"Resources": {
+		"MyAutoScalingGroup": {
+			"Type": "AWS::AutoScaling::AutoScalingGroup",
+			"Properties": {
+				"VPCZoneIdentifier": [
+					{
+						"Ref": "SubnetId"
+					},
+					{
+						"Ref": "SubnetId2"
+					}
+				],
+				"LaunchConfigurationName": {
+					"Ref": "MyLaunchConfiguration"
+				},
+				"MinSize": "3",
+				"MaxSize": "3",
+				"Tags": [
+					{
+						"PropagateAtLaunch": true,
+						"Key": "NAME",
+						"Value": "CSYE6225"
+					}
+				],
+				"TargetGroupARNs": [
+					{
+						"Ref": "ALBTargetGroup"
+					}
+				]
+			}
+		},
+		"MyLaunchConfiguration": {
+			"Type": "AWS::AutoScaling::LaunchConfiguration",
+			"Properties": {
+				"ImageId": {
+					"Ref": "ImageId"
+				},
+				"InstanceType": {
+					"Ref": "InstanceType"
+				},
+				"IamInstanceProfile": {
+					"Ref": "CodeDeployServiceRoleInstanceProfile"
+				},
+				"SecurityGroups": [
+					{
+						"Ref": "WebServerSecurityGroup"
+
+
+					}
+				],
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": [
+							"",
+							[
+								"#!/bin/bash\n",
+								"sudo apt-get update\n",
+								"sudo apt-get install openjdk-8-jdk -y\n",
+								"sudo apt-get install tomcat8 -y\n",
+								"sudo service tomcat8 start\n",
+								"sudo apt-get update\n",
+								"sudo apt-get install ruby -y\n",
+								"sudo apt-get install wget\n",
+								"cd /home/ubuntu\n",
+								"wget https://aws-codedeploy-us-east-1.s3.amazonaws.com/latest/install\n",
+								"chmod +x ./install\n",
+								"sudo ./install auto\n",
+								"sudo service codedeploy-agent start\n",
+								"sudo service codedeploy-agent status\n",
+								"echo '#!/bin/sh' >> /usr/share/tomcat8/bin/setenv.sh \n",
+								{
+									"Fn::Sub": "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dspring.datasource.url=jdbc:mysql://${RDSInstance.Endpoint.Address}:3306/csye6225\"' >> /usr/share/tomcat8/bin/setenv.sh\n"
+								},
+								{
+									"Fn::Sub": "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dspring.datasource.username=${DBUser}\"' >> /usr/share/tomcat8/bin/setenv.sh\n"
+								},
+								{
+									"Fn::Sub": "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dspring.datasource.password=${DBPassword}\"' >> /usr/share/tomcat8/bin/setenv.sh\n"
+								},
+								{
+									"Fn::Sub": "echo 'JAVA_OPTS=\"$JAVA_OPTS -Dbucket.name=${S3BucketName}\"' >> /usr/share/tomcat8/bin/setenv.sh\n"
+								},
+								"chmod +x /usr/share/tomcat8/bin/setenv.sh\n",
+								"chown tomcat8:tomcat8 /usr/share/tomcat8/bin/setenv.sh\n",
+								"chmod 777 -R /tmp\n",
+								"chmod 777 /var/lib/tomcat8\n",
+								"chmod 777 /var/lib/tomcat8/webapps\n",
+								"echo '#!/bin/sh' >> /etc/systemd/system/awslogs.service\n",
+								"echo '[Unit]' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'Description=The CloudWatch Logs agent' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'After=rc-local.service' >> /etc/systemd/system/awslogs.service\n",
+								"echo '' >> /etc/systemd/system/awslogs.service\n",
+								"echo '[Service]' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'Type=simple' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'Restart=always' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'KillMode=process' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'TimeoutSec=infinity' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'PIDFile=/var/awslogs/state/awslogs.pid' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'ExecStart=/var/awslogs/bin/awslogs-agent-launcher.sh --start --background --pidfile $PIDFILE --user awslogs --chuid awslogs &' >> /etc/systemd/system/awslogs.service\n",
+								"echo '' >> /etc/systemd/system/awslogs.service\n",
+								"echo '[Install]' >> /etc/systemd/system/awslogs.service\n",
+								"echo 'WantedBy=multi-user.target' >> /etc/systemd/system/awslogs.service\n",
+								"chmod +x /etc/systemd/system/awslogs.service\n",
+								"sudo apt-get update -y\n",
+								"sudo apt-get install python -y\n",
+								"wget https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py\n",
+								"echo ' ' >> /home/ubuntu/awslogs.conf \n",
+								"python awslogs-agent-setup.py -n -r ",
+								{
+									"Ref": "AWS::Region"
+								},
+								" -c /home/ubuntu/awslogs.conf || error_exit 'Failed to run CloudWatch Logs agent setup'\n ",
+								"sudo rm -R /home/ubuntu/awslogs.conf\n"
+							]
+						]
+					}
+				},
+				"KeyName": {
+					"Ref": "KeyName"
+				},
+				"BlockDeviceMappings": [
+					{
+						"DeviceName": "/dev/sdf",
+						"Ebs": {
+							"VolumeSize": "16",
+							"VolumeType": "gp2"
+						}
+					}
+				]
+			}
+		},
+		"WebServerSecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupName": {
+					"Ref": "GroupName"
+				},
+				"GroupDescription": "Enable HTTP access via port 80, SSH access via port 22",
+				"VpcId": {
+					"Ref": "VpcId"
+				},
+				"SecurityGroupIngress": [
+					{
+						"IpProtocol": "tcp",
+						"FromPort": "8080",
+						"ToPort": "8080",
+						"CidrIp": "0.0.0.0/0"
+					},
+					{
+						"IpProtocol": "tcp",
+						"FromPort": "22",
+						"ToPort": "22",
+						"CidrIp": "0.0.0.0/0"
+					},
+					{
+						"IpProtocol": "tcp",
+						"FromPort": "443",
+						"ToPort": "443",
+						"CidrIp": "0.0.0.0/0"
+					},
+					{
+						"IpProtocol": "tcp",
+						"FromPort": "3306",
+						"ToPort": "3306",
+						"CidrIp": "0.0.0.0/0"
+					}
+				]
+			}
+		},
+		"ALBSecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupName": {
+					"Ref": "GroupName1"
+				},
+				"GroupDescription": "Enable HTTP access via port 80, SSH access via port 22",
+				"VpcId": {
+					"Ref": "VpcId"
+				},
+				"SecurityGroupIngress": [
+					{
+						"IpProtocol": "tcp",
+						"FromPort": "443",
+						"ToPort": "443",
+						"CidrIp": "0.0.0.0/0"
+					}
+				]
+			}
+		},
+		"CreateTravisPolicyS3": {
+			"Type": "AWS::IAM::ManagedPolicy",
+			"Properties": {
+				"Description": "test",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": [
+								"s3:PutObject"
+							],
+							"Resource": [
+								"*"
+							]
+						}
+					]
+				},
+				"Users": [
+					"travis"
+				],
+				"ManagedPolicyName": {
+					"Ref": "TravisS3"
+				}
+			}
+		},
+		"CreateCodeDeployEC2Ploicy": {
+			"Type": "AWS::IAM::ManagedPolicy",
+			"Properties": {
+				"Description": "test2",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Action": [
+								"s3:Get*",
+								"s3:List*"
+							],
+							"Effect": "Allow",
+							"Resource": "*"
+						}
+					]
+				},
+				"ManagedPolicyName": {
+					"Ref": "CodeDepEC2S3"
+				}
+			}
+		},
+		"CloudWatchEc2Policy": {
+			"Type": "AWS::IAM::ManagedPolicy",
+			"Properties": {
+				"Description": "test2",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": [
+								"logs:CreateLogGroup",
+								"logs:CreateLogStream",
+								"logs:PutLogEvents",
+								"logs:DescribeLogStreams"
+							],
+							"Resource": [
+								"arn:aws:logs:*:*:*"
+							]
+						}
+					]
+				},
+				"Users": [
+					"travis"
+				],
+				"ManagedPolicyName": {
+					"Ref": "CloudwatchPolicy"
+				}
+			}
+		},
+		"TravisCodeDeployPolicy": {
+			"Type": "AWS::IAM::ManagedPolicy",
+			"Properties": {
+				"Description": "test2",
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": [
+								"codedeploy:RegisterApplicationRevision",
+								"codedeploy:GetApplicationRevision"
+							],
+							"Resource": [
+								"arn:aws:codedeploy:us-east-1:373746460713:application:csye6225application"
+							]
+						},
+						{
+							"Effect": "Allow",
+							"Action": [
+								"codedeploy:CreateDeployment",
+								"codedeploy:GetDeployment"
+							],
+							"Resource": [
+								"*"
+							]
+						},
+						{
+							"Effect": "Allow",
+							"Action": [
+								"codedeploy:GetDeploymentConfig"
+							],
+							"Resource": [
+								"arn:aws:codedeploy:us-east-1:373746460713:deploymentconfig:CodeDeployDefault.OneAtATime",
+								"arn:aws:codedeploy:us-east-1:373746460713:deploymentconfig:CodeDeployDefault.HalfAtATime",
+								"arn:aws:codedeploy:us-east-1:373746460713:deploymentconfig:CodeDeployDefault.AllAtOnce"
+							]
+						}
+					]
+				},
+				"Users": [
+					"travis"
+				],
+				"ManagedPolicyName": {
+					"Ref": "TravisCodeDep"
+				}
+			}
+		},
+		"CodeDeployEC2ServiceRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Principal": {
+								"Service": [
+									"ec2.amazonaws.com"
+								]
+							},
+							"Action": [
+								"sts:AssumeRole"
+							]
+						}
+					]
+				},
+				"ManagedPolicyArns": [
+					{
+						"Ref": "CreateCodeDeployEC2Ploicy"
+					},
+					"arn:aws:iam::aws:policy/AmazonS3FullAccess",
+					"arn:aws:iam::aws:policy/AWSConnector",
+					"arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+					"arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+					"arn:aws:iam::aws:policy/AmazonSESFullAccess"
+				],
+				"RoleName": {
+					"Ref": "CodeDepEc2ServiceRole"
+				}
+			}
+		},
+		"CodeDeployServiceRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Principal": {
+								"Service": [
+									"codedeploy.amazonaws.com"
+								]
+							},
+							"Action": [
+								"sts:AssumeRole"
+							]
+						}
+					]
+				},
+				"ManagedPolicyArns": [
+					"arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+				],
+				"RoleName": {
+					"Ref": "CodeDepRole"
+				}
+			}
+		},
+		"LamdaSNSRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+							},
+							"Action": [
+								"sts:AssumeRole"
+							]
+						}
+					]
+				},
+				"ManagedPolicyArns": [
+					"arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+					"arn:aws:iam::aws:policy/AmazonSNSFullAccess",
+					"arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+					"arn:aws:iam::aws:policy/AmazonSESFullAccess"
+				],
+				"RoleName": {
+					"Ref": "LamdaSnsRole"
+				}
+			}
+		},
+		"CodeDeployServiceRoleInstanceProfile": {
+			"Type": "AWS::IAM::InstanceProfile",
+			"Properties": {
+				"Path": "/",
+				"Roles": [
+					{
+						"Ref": "CodeDeployEC2ServiceRole"
+					}
+				]
+			}
+		},
+		"RDSInstance": {
+			"Type": "AWS::RDS::DBInstance",
+			"Properties": {
+				"AllocatedStorage": {
+					"Ref": "AllocatedStorage"
+				},
+				"DBInstanceClass": {
+					"Ref": "DBInstanceClass"
+				},
+				"Engine": {
+					"Ref": "Engine"
+				},
+				"EngineVersion": {
+					"Ref": "EngineVersion"
+				},
+				"MultiAZ": "false",
+				"DBInstanceIdentifier": {
+					"Ref": "DBInstanceIdentifier"
+				},
+				"StorageType": "gp2",
+				"MasterUsername": {
+					"Ref": "DBUser"
+				},
+				"MasterUserPassword": {
+					"Ref": "DBPassword"
+				},
+				"DBSubnetGroupName": {
+					"Ref": "MyDBSubnetGroup"
+				},
+				"PubliclyAccessible": "false",
+				"DBName": {
+					"Ref": "DBName"
+				},
+				"VPCSecurityGroups": [
+					{
+						"Fn::GetAtt": [
+							"RDSSecurityGroup",
+							"GroupId"
+						]
+					}
+				]
+			}
+		},
+		"RDSSecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "Open database for access",
+				"GroupName": {
+					"Ref": "RDSGroupName"
+				},
+				"SecurityGroupIngress": [
+					{
+						"IpProtocol": "tcp",
+						"FromPort": "3306",
+						"ToPort": "3306",
+						"SourceSecurityGroupId": {
+							"Fn::GetAtt": [
+								"WebServerSecurityGroup",
+								"GroupId"
+							]
+						}
+					}
+				]
+			}
+		},
+		"MyDBSubnetGroup": {
+			"Type": "AWS::RDS::DBSubnetGroup",
+			"Properties": {
+				"DBSubnetGroupDescription": "Subnets available for the RDS DB Instance",
+				"SubnetIds": [
+					{
+						"Ref": "SubnetId"
+					},
+					{
+						"Ref": "SubnetId2"
+					}
+				]
+			}
+		},
+		"MyDynamoDBTable": {
+			"Type": "AWS::DynamoDB::Table",
+			"Properties": {
+				"TableName": {
+					"Ref": "TableName"
+				},
+				"AttributeDefinitions": [
+					{
+						"AttributeName": {
+							"Ref": "PrimaryKeyName"
+						},
+						"AttributeType": "S"
+					}
+				],
+				"KeySchema": [
+					{
+						"AttributeName": {
+							"Ref": "PrimaryKeyName"
+						},
+						"KeyType": "HASH"
+					}
+				],
+				"ProvisionedThroughput": {
+					"ReadCapacityUnits": "5",
+					"WriteCapacityUnits": "5"
+				},
+				"TimeToLiveSpecification": {
+					"AttributeName": "ttl",
+					"Enabled": "TRUE"
+				}
+			}
+		},
+		"S3Bucket": {
+			"Type": "AWS::S3::Bucket",
+			"Properties": {
+				"BucketName": {
+					"Ref": "S3BucketName"
+				}
+			}
+		},
+		"ALBListener": {
+			"Type": "AWS::ElasticLoadBalancingV2::Listener",
+			"Properties": {
+				"Certificates": [
+					{
+						"CertificateArn": {
+							"Ref": "certificatearn"
+						}
+					}
+				],
+				"DefaultActions": [
+					{
+						"Type": "forward",
+						"TargetGroupArn": {
+							"Ref": "ALBTargetGroup"
+						}
+					}
+				],
+				"LoadBalancerArn": {
+					"Ref": "ApplicationLoadBalancer"
+				},
+				"Port": "443",
+				"Protocol": "HTTPS"
+			}
+		},
+		"ApplicationLoadBalancer": {
+			"Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+			"Properties": {
+				"Scheme": "internet-facing",
+				"Subnets": [
+					{
+						"Ref": "SubnetId"
+					},
+					{
+						"Ref": "SubnetId2"
+					}
+				],
+				"SecurityGroups": [
+					{
+						"Ref": "ALBSecurityGroup"
+					}
+				],
+				"Type": "application",
+				"IpAddressType": "ipv4"
+			}
+		},
+		"ALBTargetGroup": {
+			"Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties": {
+				"HealthCheckPort":8080,
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 4,
+				"HealthCheckIntervalSeconds": 30,
+				"UnhealthyThresholdCount": 3,
+				"HealthCheckPath": "/",
+				"Name": "MyTargetGroup",
+				"Port": 8080,
+				"Protocol": "HTTP",
+				"VpcId": {
+					"Ref": "VpcId"
+				}
+			}
+		},
+		"ResourceRecords": {
+			"Type": "AWS::Route53::RecordSet",
+			"Properties": {
+				"HostedZoneId": {
+					"Ref": "HostedZoneId"
+				},
+				"Name": {
+					"Ref": "Name"
+				},
+				"AliasTarget": {
+					"DNSName": {
+						"Fn::GetAtt": [
+							"ApplicationLoadBalancer",
+							"DNSName"
+						]
+					},
+					"HostedZoneId": {
+						"Fn::GetAtt": [
+							"ApplicationLoadBalancer",
+							"CanonicalHostedZoneID"
+						]
+					},
+					"EvaluateTargetHealth": true
+				},
+				"Type": "A"
+			}
+		},
+		"MySNSTopic": {
+			"Type": "AWS::SNS::Topic",
+
+"Properties": {
+
+			"Properties": {
+
+				"TopicName": {
+					"Ref": "SnsTopic"
+				}
+			}
+}
+	}
+}
+
+
+
